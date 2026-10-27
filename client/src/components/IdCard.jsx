@@ -50,10 +50,8 @@ export function Front({ student, batch }) {
           </div>
         </div>
       </div>
-      <BallArt className="id-band" />
-      <div className="id-logo-plate">
+      <div className="id-logo-only">
         <img src={logo} alt="Pattabhi Sports Club" />
-        <span>Pattabhi Sports Club</span>
       </div>
     </div>
   );
