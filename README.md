@@ -9,10 +9,10 @@ Needs Node.js 22.13 or newer.
 ```bash
 npm install --prefix client      # first time only
 npm run build                    # builds the React app into client/dist
-PSC_USER=Sid PSC_PASS='choose-a-strong-password' npm start
+npm start
 ```
 
-Open http://localhost:3000 and log in. The data is stored in `data/psc.db`. Set `PSC_DATA` to keep it elsewhere and `PORT` to change the port.
+Open http://localhost:3000. The data is stored in `data/psc.db`. Set `PSC_DATA` to keep it elsewhere and `PORT` to change the port.
 
 For development with hot reload, run `npm start` in one terminal and `npm run dev` in another, then open the Vite address it prints. Vite forwards `/api` to the server on port 3000.
 
@@ -24,7 +24,7 @@ For development with hot reload, run `npm start` in one terminal and `npm run de
 
 ## Use it from anywhere
 
-Deploy it on any host that runs Node (Render, Railway, a VPS, and similar) and attach a persistent disk for `PSC_DATA`. Always serve it over HTTPS, because the login is a standard browser username and password. Set `PSC_USER` and `PSC_PASS` as environment variables on the host.
+Deploy it on any host that runs Node (Render, Railway, a VPS, and similar) and attach a persistent disk for `PSC_DATA`. There is no login at the moment, so only run it on a network you trust, and put it behind a login before anyone outside the club can reach it.
 
 To install on a phone, open the site and choose "Add to Home Screen". On a laptop, use the install icon in Chrome or Edge.
 

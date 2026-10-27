@@ -10,13 +10,7 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 // The React build. Run `npm run build` once before starting the server.
 const publicDir = path.join(root, 'client', 'dist');
 const dataDir = process.env.PSC_DATA || path.join(root, 'data');
-const { PSC_USER, PSC_PASS } = process.env;
 const port = process.env.PORT || 3000;
-
-if (!PSC_USER || !PSC_PASS) {
-  console.error('Set PSC_USER and PSC_PASS before starting the server.');
-  process.exit(1);
-}
 
 mkdirSync(dataDir, { recursive: true });
 const db = new DatabaseSync(path.join(dataDir, 'psc.db'));
@@ -516,34 +510,10 @@ const serveStatic = async (res, pathname) => {
   }
 };
 
-const authorized = (req) => {
-  const header = req.headers.authorization || '';
-  if (!header.startsWith('Basic ')) return false;
-  const given = Buffer.from(header.slice(6), 'base64');
-  const want = Buffer.from(`${PSC_USER}:${PSC_PASS}`);
-  return given.length === want.length && timingSafeEqual(given, want);
-};
-
-// Branding and the Rive runtime hold no club data. Public so the install manifest can be fetched without login.
-const PUBLIC_FILES = new Set([
-  '/manifest.webmanifest',
-  '/logo.png',
-  '/icon-192.png',
-  '/icon-512.png',
-  '/apple-touch-icon.png',
-  '/favicon-32.png',
-  '/favicon-64.png',
-  '/rive.wasm',
-]);
-
 createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
-  if (!PUBLIC_FILES.has(url.pathname) && !OPEN_PATHS.has(url.pathname) && !authorized(req)) {
-    res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="PSC Dashboard"' });
-    return res.end('Login required');
-  }
   try {
-    // CSRF guard: the browser login is sent automatically, so state-changing API calls must come from this site and send JSON.
+    // CSRF guard: stops a web page open in a visitor's browser from changing club records. Changes must come from this site and send JSON.
     // Plain HTML forms cannot send application/json, and cross-site fetches with it trigger a preflight that is refused.
     if (['POST', 'PUT', 'DELETE'].includes(req.method) && url.pathname.startsWith('/api/') && !OPEN_PATHS.has(url.pathname)) {
       const origin = req.headers.origin;

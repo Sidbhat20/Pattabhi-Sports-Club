@@ -37,3 +37,6 @@ export const absentMessage = (s, day) =>
   `Hi ${greeting(s)}, ${s.name} was marked absent from Pattabhi Sports Club training on ${dayLabel(day)}. Please let us know if they will miss sessions. Thank you!`;
 export const generalMessage = (s) =>
   `Hi ${greeting(s)}, this is Pattabhi Sports Club about ${s.name}.`;
+
+// Student ID shown on the card: PSC- and the record number, padded to four digits.
+export const studentId = (s) => `PSC-${String(s.id).padStart(4, '0')}`;
