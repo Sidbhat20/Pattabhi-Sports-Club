@@ -7,6 +7,7 @@ import { FormDialog } from './components/FormDialog.jsx';
 import { Loader } from './components/Loader.jsx';
 import { Toast, useToast } from './components/ui.jsx';
 import { Home } from './views/Home.jsx';
+import { IdCardPage } from './components/IdCard.jsx';
 import { Students } from './views/Students.jsx';
 import { Attendance } from './views/Attendance.jsx';
 import { Fees } from './views/Fees.jsx';
@@ -24,6 +25,7 @@ const currentView = () => {
 export default function App() {
   const [data, setData] = useState(null);
   const [view, setView] = useState(currentView);
+  const [hash, setHash] = useState(window.location.hash);
   const [ui, setUi] = useState({ month: thisMonth(), day: today(), search: '', batch: '', personType: 'student' });
   const [form, setForm] = useState(null);
   const [info, setInfo] = useState({ demo: false });
@@ -44,7 +46,10 @@ export default function App() {
   }, [refresh]);
 
   useEffect(() => {
-    const onHash = () => setView(currentView());
+    const onHash = () => {
+      setView(currentView());
+      setHash(window.location.hash);
+    };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
@@ -86,6 +91,9 @@ export default function App() {
   };
 
   if (!data) return <Loader />;
+  // The student ID card opens on its own page, in a new tab.
+  const cardId = /^#card\/(\d+)$/.exec(hash)?.[1];
+  if (cardId) return <IdCardPage data={data} id={cardId} />;
   const View = VIEWS[view];
 
   return (
