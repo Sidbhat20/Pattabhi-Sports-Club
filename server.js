@@ -95,6 +95,11 @@ db.exec(`
     status TEXT
   );
 `);
+// Existing databases: add the chat columns where they are missing.
+const messageCols = db.prepare('PRAGMA table_info(messages)').all().map((c) => c.name);
+if (!messageCols.includes('chat')) db.exec('ALTER TABLE messages ADD COLUMN chat TEXT');
+if (!messageCols.includes('sender')) db.exec('ALTER TABLE messages ADD COLUMN sender TEXT');
+if (!messageCols.includes('reactions')) db.exec("ALTER TABLE messages ADD COLUMN reactions TEXT NOT NULL DEFAULT '[]'");
 // Existing databases: add the biometric column where it is missing.
 for (const table of ['students', 'coaches']) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
@@ -288,7 +293,9 @@ const api = async (req, res, url) => {
   if (url.pathname === '/api/events') return events(req, res);
   if (url.pathname === '/api/biometric/punch') return punch(req, res);
   if (url.pathname === '/api/whatsapp/webhook') return webhook(req, res, url);
-  if (url.pathname === '/api/messages') return messagesApi(req, res);
+  if (url.pathname === '/api/messages') return messagesApi(req, res, url);
+  const reactMatch = /^\/api\/messages\/(\d+)\/react$/.exec(url.pathname);
+  if (reactMatch) return messageReact(req, res, Number(reactMatch[1]));
   if (url.pathname === '/api/punches' && req.method === 'GET') {
     const d = day(url.searchParams.get('day') || '');
     return send(
@@ -452,40 +459,66 @@ const webhook = async (req, res, url) => {
   res.end('ok');
 };
 
-const messagesApi = async (req, res) => {
+const messageRow = (row) => ({ ...row, reactions: JSON.parse(row.reactions || '[]') });
+const CHAT_KEY = /^[a-z0-9-]{2,40}$/;
+
+// Messages are saved here. When WhatsApp is not connected they are marked "demo" and nothing is sent.
+const messagesApi = async (req, res, url) => {
   if (req.method === 'GET') {
-    return send(res, 200, db.prepare('SELECT * FROM messages ORDER BY id DESC LIMIT 500').all().reverse());
+    const rows = db.prepare('SELECT * FROM messages ORDER BY id DESC LIMIT 500').all().reverse();
+    return send(res, 200, rows.map(messageRow));
   }
   if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
   const body = await readBody(req);
-  let to = String(body.phone ?? '').replace(/\D/g, '');
-  if (to.length === 10) to = `91${to}`;
   const msg = text(1000)(body.body ?? '');
-  if (to.length < 12 || !msg) fail('Enter a phone number and a message');
+  if (!msg) fail('Write a message first');
 
-  if (DEMO) {
-    // Demo mode: the message is saved and shown, but nothing is sent to WhatsApp.
-    const at = new Date().toISOString();
-    const info = db.prepare("INSERT INTO messages (direction, phone, body, at, status) VALUES ('out', ?, ?, ?, 'demo')").run(to, msg, at);
-    broadcast({ type: 'message', direction: 'out', phone: to });
-    return send(res, 201, db.prepare('SELECT * FROM messages WHERE id = ?').get(Number(info.lastInsertRowid)));
+  // A group or coach chat, by key. A one-to-one chat, by phone number.
+  let chat = null;
+  let to = String(body.phone ?? '').replace(/\D/g, '');
+  if (body.chat) {
+    chat = String(body.chat);
+    if (!CHAT_KEY.test(chat)) fail('Unknown chat');
+    to = to || chat;
+  } else {
+    if (to.length === 10) to = `91${to}`;
+    if (to.length < 12) fail('Enter a phone number and a message');
   }
-  if (!WA_TOKEN || !WA_PHONE_ID) {
-    throw new HttpError(503, 'WhatsApp is not connected yet. Add WA_TOKEN and WA_PHONE_ID on the server.');
+
+  let status = 'demo';
+  if (!chat && WA_TOKEN && WA_PHONE_ID) {
+    const r = await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: msg } }),
+    });
+    const json = await r.json().catch(() => ({}));
+    if (!r.ok) throw new HttpError(502, json.error?.message || 'WhatsApp rejected the message');
+    status = 'sent';
   }
+  const info = db
+    .prepare("INSERT INTO messages (direction, phone, body, at, status, chat, sender) VALUES ('out', ?, ?, ?, ?, ?, 'You')")
+    .run(to, msg, new Date().toISOString(), status, chat);
+  const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(Number(info.lastInsertRowid));
+  broadcast({ type: 'message', direction: 'out', phone: to, chat });
+  send(res, 201, messageRow(row));
+};
 
-  const r = await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: msg } }),
-  });
-  const json = await r.json().catch(() => ({}));
-  if (!r.ok) throw new HttpError(502, json.error?.message || 'WhatsApp rejected the message');
-
-  const at = new Date().toISOString();
-  const info = db.prepare("INSERT INTO messages (direction, phone, body, at, status) VALUES ('out', ?, ?, ?, 'sent')").run(to, msg, at);
-  broadcast({ type: 'message', direction: 'out', phone: to });
-  send(res, 201, db.prepare('SELECT * FROM messages WHERE id = ?').get(Number(info.lastInsertRowid)));
+// Reactions: tap an emoji on a message. Tapping the same one again removes it.
+const messageReact = async (req, res, id) => {
+  if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
+  const body = await readBody(req);
+  const emoji = String(body.emoji ?? '');
+  if (!['👍', '❤️', '😂', '🙏'].includes(emoji)) fail('Unknown reaction');
+  const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+  if (!row) throw new HttpError(404, 'Not found');
+  const list = JSON.parse(row.reactions || '[]');
+  const mine = list.findIndex((r) => r.who === 'You' && r.emoji === emoji);
+  if (mine >= 0) list.splice(mine, 1);
+  else list.push({ who: 'You', emoji });
+  db.prepare('UPDATE messages SET reactions = ? WHERE id = ?').run(JSON.stringify(list), id);
+  broadcast({ type: 'message', direction: row.direction, phone: row.phone, chat: row.chat });
+  send(res, 200, messageRow(db.prepare('SELECT * FROM messages WHERE id = ?').get(id)));
 };
 
 const types = {

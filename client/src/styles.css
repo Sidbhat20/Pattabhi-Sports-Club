@@ -456,3 +456,16 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
   .id-face:last-child { break-after: auto; page-break-after: auto; }
   .id-face * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 }
+
+/* WhatsApp: group sender names, reactions and the reaction picker */
+.wa-sender { display: block; font-size: 12px; font-weight: 600; color: #7a3b1f; margin-bottom: 2px; }
+.wa-meta { align-items: center; }
+.wa-react-btn { border: 0; background: transparent; padding: 0 4px 0 0; font-size: 13px; color: #667781; cursor: pointer; margin-right: auto; }
+.wa-picker { position: absolute; margin-top: 4px; display: flex; gap: 2px; padding: 4px; background: #fff; border-radius: 99px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); }
+.wa-bubble { position: relative; }
+.wa-picker button { border: 0; background: transparent; font-size: 18px; padding: 2px 4px; cursor: pointer; border-radius: 50%; }
+.wa-picker button:hover { background: #f0f2f5; }
+.wa-reactions { display: flex; gap: 4px; margin: -6px 6px 4px; }
+.wa-reactions.out { justify-content: flex-end; }
+.wa-react-chip { background: #fff; border-radius: 99px; padding: 1px 6px; font-size: 12px; box-shadow: 0 1px 1px rgba(0, 0, 0, 0.12); }
+.wa-empty { margin: auto; color: #667781; font-size: 13px; }
