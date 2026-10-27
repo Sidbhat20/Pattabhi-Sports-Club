@@ -1,0 +1,12 @@
+node_modules/
+client/node_modules/
+client/dist/
+data/
+demo/data/
+.admin-password
+.impeccable/
+*.db
+*.db-shm
+*.db-wal
+.DS_Store
+.playwright-mcp/
