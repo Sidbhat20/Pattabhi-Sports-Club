@@ -10,3 +10,4 @@ demo/data/
 *.db-wal
 .DS_Store
 .playwright-mcp/
+client/dist-mock/

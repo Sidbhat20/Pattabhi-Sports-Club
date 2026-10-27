@@ -151,33 +151,38 @@ function buildData() {
   });
   punches.sort((a, b) => b.at.localeCompare(a.at));
 
-  // Chats: parents asking questions, and coaches checking the ground.
+  // The three demo chats: a parents' group, a coach and a parent. Same content as the real dashboard.
   let msgId = 0;
-  const thread = (phone, script) =>
-    script.forEach(([dir, body, mins]) =>
-      messages.push({ id: ++msgId, direction: dir, phone, body, at: minutesAgo(mins), status: dir === 'in' ? 'received' : mins > 60 ? 'read' : 'delivered' }),
+  const chat = (key, script) =>
+    script.forEach(([dir, body, mins, sender, reacts]) =>
+      messages.push({
+        id: ++msgId,
+        direction: dir,
+        phone: key,
+        chat: key,
+        sender,
+        body,
+        at: minutesAgo(mins),
+        status: dir === 'in' ? 'received' : mins > 60 ? 'read' : 'delivered',
+        reactions: (reacts || []).map(([who, emoji]) => ({ who, emoji })),
+      }),
     );
-  const parentPhone = (sid) => data.students.find((s) => s.id === sid).guardian_phone;
-  thread(parentPhone(4), [
-    ['in', 'Hi, will Arjun be able to attend tomorrow? He has a school exam in the morning.', 190],
-    ['out', 'Hello, yes. Training is in the evening, so it is fine. Please let us know if it changes.', 180],
-    ['in', 'Thank you. Also, when is the next fee due?', 42],
+  chat('parents-pattabhi', [
+    ['out', 'Class cancelled today due to rain. Sessions resume tomorrow.', 200, 'You', [['Meera Bhat', '👍'], ['Divya Rao', '👍'], ['Lata Gowda', '🙏']]],
+    ['in', 'Thank you for the update.', 190, 'Meera Bhat'],
+    ['out', 'Today is a holiday for all batches. No training.', 60, 'You', [['Divya Rao', '❤️'], ['Meera Bhat', '👍'], ['Prakash Shetty', '👍']]],
+    ['in', 'Thanks! Enjoy the break everyone.', 50, 'Lata Gowda'],
   ]);
-  thread(parentPhone(9), [
-    ['in', 'What is the fee for the U16 batch from next month?', 95],
-    ['in', 'Also, do we get a receipt for UPI payments?', 93],
-    ['out', 'Hello. U16 is ₹1,500 a month. Yes, every UPI payment gets a receipt from the office.', 70],
+  chat('coach-shridhar', [
+    ['in', 'Good morning. Can we discuss the coaching money for this month?', 120, 'Shridhar'],
+    ['out', "Yes, I'll share the details by evening.", 110, 'You'],
+    ['in', 'Thanks. Please also check the pending kit money for U18.', 100, 'Shridhar'],
   ]);
-  thread(parentPhone(21), [
-    ['in', 'Our son has a cold. Will he be marked absent or can we just skip?', 25],
-  ]);
-  thread(parentPhone(33), [
-    ['in', 'Is there a receipt for cash payments too?', 300],
-    ['out', 'Yes. Ask at the front desk and we will write one.', 290],
-  ]);
-  thread(data.coaches[2].phone, [
-    ['in', 'Can I take U18 at 7 tomorrow? The ground is booked for the league.', 120],
-    ['out', 'Yes, go ahead. I will confirm the ground by evening.', 100],
+  chat('parent-siddharth', [
+    ['in', 'Siddharth will be absent today.', 240, 'Ananya Menon'],
+    ['out', "Thank you for letting us know. We'll mark him absent today.", 230, 'You'],
+    ['in', 'I will come to pick up Siddharth late today, around 7:30 PM.', 45, 'Ananya Menon'],
+    ['out', "Yes, that's fine. We'll keep him in the office until then.", 40, 'You'],
   ]);
 
   const focusFor = { Sangeetha: 'Shooting', Mahesh: 'Dribbling', Shridhar: 'Pick and roll', Ranga: 'Footwork' };
@@ -252,36 +257,59 @@ function writeRecord(table, id, body) {
   return row;
 }
 
-const reply = (phone) => {
-  if (Math.random() < 0.8) {
-    setTimeout(() => {
-      const msg = {
-        id: store.messages.length + 1000,
-        direction: 'in',
-        phone,
-        body: pick(REPLIES),
-        at: new Date().toISOString(),
-        status: 'received',
-      };
-      store.messages.push(msg);
-      emit({ type: 'message', direction: 'in', phone });
-    }, 2500 + Math.random() * 2000);
-  }
+const PEOPLE = {
+  'parents-pattabhi': ['Meera Bhat', 'Divya Rao', 'Lata Gowda', 'Prakash Shetty'],
+  'coach-shridhar': ['Shridhar'],
+  'parent-siddharth': ['Ananya Menon'],
+};
+const SCRIPTED = {
+  'parents-pattabhi': [[/./, ['Thank you for the update.', 'Noted, thank you.', 'Thanks for letting us know.']]],
+  'coach-shridhar': [
+    [/money|fee|pay|kit|amount/i, ['Okay, I will send the details by evening.', 'Thanks, I will check the list and share it.']],
+    [/ground|court|booking|saturday|session|practice/i, ['Sure, see you at the ground.', 'Okay, I will confirm with the ground.']],
+    [/./, ['Okay, noted.', 'Sure, will do.']],
+  ],
+  'parent-siddharth': [
+    [/absent|late|pick|pickup|time|today/i, ['Thank you, that is fine.', 'Okay, thank you for letting us know.']],
+    [/./, ['Thank you.', 'Okay.']],
+  ],
 };
 
-const sent = (phone, body) => {
-  const row = { id: store.messages.length + 1000, direction: 'out', phone, body, at: new Date().toISOString(), status: 'sent' };
+// Replies in a chat answer what you wrote, after a short pause.
+const reply = (chatKey, text) => {
+  const rules = SCRIPTED[chatKey];
+  if (!rules) return;
+  const [, options] = rules.find(([re]) => re.test(text));
+  setTimeout(() => {
+    const msg = {
+      id: store.messages.length + 1000,
+      direction: 'in',
+      phone: chatKey,
+      chat: chatKey,
+      sender: pick(PEOPLE[chatKey]),
+      body: pick(options),
+      at: new Date().toISOString(),
+      status: 'received',
+      reactions: [],
+    };
+    store.messages.push(msg);
+    emit({ type: 'message', direction: 'in', phone: chatKey, chat: chatKey });
+  }, 2000 + Math.random() * 2000);
+};
+
+const sent = (chatKey, body) => {
+  const row = { id: store.messages.length + 1000, direction: 'out', phone: chatKey, chat: chatKey, sender: 'You', body, at: new Date().toISOString(), status: 'sent', reactions: [] };
   store.messages.push(row);
-  emit({ type: 'message', direction: 'out', phone });
+  emit({ type: 'message', direction: 'out', phone: chatKey, chat: chatKey });
   setTimeout(() => {
     row.status = 'delivered';
-    emit({ type: 'message', direction: 'out', phone });
+    emit({ type: 'message', direction: 'out', phone: chatKey, chat: chatKey });
   }, 800);
   setTimeout(() => {
     row.status = 'read';
-    emit({ type: 'message', direction: 'out', phone });
+    emit({ type: 'message', direction: 'out', phone: chatKey, chat: chatKey });
   }, 2500);
-  reply(phone);
+  reply(chatKey, body);
   return row;
 };
 
@@ -294,7 +322,7 @@ export async function mockRequest(method, url, body) {
 
   if (res === 'info') return { demo: true, mock: true };
   if (res === 'data' && method === 'GET') {
-    return clone({ coaches: store.data.coaches, batches: store.data.batches, students: store.data.students, payments: store.data.payments, expenses: store.data.expenses });
+    return clone({ coaches: store.data.coaches, batches: store.data.batches, students: store.data.students, payments: store.data.payments, expenses: store.data.expenses, sessions: store.data.sessions });
   }
   if (res === 'attendance') {
     const day = params.get('day');
@@ -321,11 +349,21 @@ export async function mockRequest(method, url, body) {
   }
   if (res === 'messages') {
     if (method === 'GET') return clone(store.messages);
+    if (method === 'POST' && path.endsWith('/react')) {
+      const row = store.messages.find((m) => m.id === id);
+      if (!row) throw new Error('Not found');
+      const i = row.reactions.findIndex((r) => r.who === 'You' && r.emoji === body.emoji);
+      if (i >= 0) row.reactions.splice(i, 1);
+      else row.reactions.push({ who: 'You', emoji: body.emoji });
+      emit({ type: 'message', direction: row.direction, phone: row.phone, chat: row.chat });
+      return clone(row);
+    }
     if (method === 'POST') {
-      const phone = String(body.phone || '').replace(/\D/g, '').slice(-10);
+      const chatKey = String(body.chat || '');
       const text = String(body.body || '').trim();
-      if (phone.length < 10 || !text) throw new Error('Enter a phone number and a message');
-      return clone(sent(phone, text));
+      if (!SCRIPTED[chatKey]) throw new Error('Unknown chat');
+      if (!text) throw new Error('Write a message first');
+      return clone(sent(chatKey, text));
     }
   }
   if (store.data[res] && method === 'POST') return clone(writeRecord(res, null, body));
