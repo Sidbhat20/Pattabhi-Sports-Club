@@ -7,7 +7,6 @@ import { FormDialog } from './components/FormDialog.jsx';
 import { Loader } from './components/Loader.jsx';
 import { Toast, useToast } from './components/ui.jsx';
 import { Home } from './views/Home.jsx';
-import { IdCardPage } from './components/IdCard.jsx';
 import { Students } from './views/Students.jsx';
 import { Attendance } from './views/Attendance.jsx';
 import { Fees } from './views/Fees.jsx';
@@ -91,9 +90,6 @@ export default function App() {
   };
 
   if (!data) return <Loader />;
-  // The student ID card opens on its own page, in a new tab.
-  const cardId = /^#card\/(\d+)$/.exec(hash)?.[1];
-  if (cardId) return <IdCardPage data={data} id={cardId} />;
   const View = VIEWS[view];
 
   return (

@@ -501,7 +501,51 @@ const messagesApi = async (req, res, url) => {
     .run(to, msg, new Date().toISOString(), status, chat);
   const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(Number(info.lastInsertRowid));
   broadcast({ type: 'message', direction: 'out', phone: to, chat });
+  if (chat) scheduleReply(chat, Number(info.lastInsertRowid), msg);
   send(res, 201, messageRow(row));
+};
+
+// Sample replies for the three demo chats. Each reply answers the words in your message.
+const DEMO_PEOPLE = {
+  'parents-pattabhi': ['Meera Bhat', 'Divya Rao', 'Lata Gowda', 'Prakash Shetty'],
+  'coach-shridhar': ['Shridhar'],
+  'parent-siddharth': ['Ananya Menon'],
+};
+const DEMO_REPLIES = {
+  'parents-pattabhi': [
+    [/./, ['Thank you for the update.', 'Noted, thank you.', 'Thanks for letting us know.', 'Okay, will do.']],
+  ],
+  'coach-shridhar': [
+    [/money|fee|pay|kit|amount|salary/i, ['Okay, I will send the details by evening.', 'Thanks, I will check the list and share it.']],
+    [/ground|court|booking|saturday|session|practice/i, ['Sure, see you at the ground.', 'Okay, I will confirm with the ground.']],
+    [/./, ['Okay, noted.', 'Sure, will do.']],
+  ],
+  'parent-siddharth': [
+    [/absent|late|pick|pickup|time|today/i, ['Thank you, that is fine.', 'Okay, thank you for letting us know.']],
+    [/./, ['Thank you.', 'Okay.']],
+  ],
+};
+const scheduleReply = (chat, outId, text) => {
+  const rules = DEMO_REPLIES[chat];
+  if (!rules) return;
+  const [, options] = rules.find(([re]) => re.test(text));
+  const reply = options[Math.floor(Math.random() * options.length)];
+  const people = DEMO_PEOPLE[chat];
+  const who = people[Math.floor(Math.random() * people.length)];
+  setTimeout(() => {
+    const info = db
+      .prepare("INSERT INTO messages (direction, phone, body, at, status, chat, sender) VALUES ('in', ?, ?, ?, 'received', ?, ?)")
+      .run(chat, reply, new Date().toISOString(), chat, who);
+    // In the group, a parent sometimes reacts to your notice.
+    if (chat === 'parents-pattabhi' && Math.random() < 0.6) {
+      const out = db.prepare('SELECT reactions FROM messages WHERE id = ?').get(outId);
+      const list = JSON.parse(out?.reactions || '[]');
+      list.push({ who, emoji: Math.random() < 0.5 ? '👍' : '❤️' });
+      db.prepare('UPDATE messages SET reactions = ? WHERE id = ?').run(JSON.stringify(list), outId);
+    }
+    broadcast({ type: 'message', direction: 'in', phone: chat, chat });
+    return info;
+  }, 2000 + Math.floor(Math.random() * 2000));
 };
 
 // Reactions: tap an emoji on a message. Tapping the same one again removes it.

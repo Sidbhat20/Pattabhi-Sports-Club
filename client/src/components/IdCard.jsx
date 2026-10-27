@@ -107,7 +107,7 @@ export function StudentPreview({ student, data, onClose }) {
             <strong>{student.name}</strong>
             <span className="preview-actions">
               <Button variant="secondary" size="small" onClick={() => window.print()}>Print</Button>
-              <Button variant="text" size="small" onClick={() => dialogRef.current.close()}>Close</Button>
+              <button type="button" className="close-x" aria-label="Close preview" onClick={() => dialogRef.current.close()}>×</button>
             </span>
           </div>
           <div className="card-faces">
@@ -117,30 +117,5 @@ export function StudentPreview({ student, data, onClose }) {
         </>
       )}
     </dialog>
-  );
-}
-
-// The card page: front and back side by side, with a print button for ID-card size.
-export function IdCardPage({ data, id }) {
-  const student = data.students.find((s) => s.id === Number(id));
-  if (!student) {
-    return (
-      <div className="card-page">
-        <p className="muted">No student with that ID.</p>
-      </div>
-    );
-  }
-  const batch = batchOf(data, student.batch_id)?.name || 'No batch';
-  return (
-    <div className="card-page">
-      <div className="card-toolbar">
-        <Button variant="primary" onClick={() => window.print()}>Print card</Button>
-        <small className="muted">Prints the front and back at ID-card size.</small>
-      </div>
-      <div className="card-faces">
-        <Front student={student} batch={batch} />
-        <Back student={student} data={data} />
-      </div>
-    </div>
   );
 }

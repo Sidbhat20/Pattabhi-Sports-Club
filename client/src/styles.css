@@ -486,3 +486,5 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
   .id-preview .card-faces { display: block; }
   .id-preview .id-face { width: 85.6mm; height: 54mm; aspect-ratio: auto; break-after: page; page-break-after: always; box-shadow: none; border: 0; border-radius: 0; }
 }
+.close-x { width: 36px; height: 36px; border: 1px solid var(--rule); border-radius: 50%; background: var(--panel); color: var(--ink); font-size: 22px; line-height: 1; cursor: pointer; display: grid; place-items: center; padding: 0; }
+.close-x:hover { border-color: var(--ink-2); }

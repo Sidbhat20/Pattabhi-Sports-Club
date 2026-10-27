@@ -3,7 +3,7 @@
 //   - Shridhar (coach chat about bookings and money)
 //   - Parent of Siddharth (absence and a late pickup)
 // Also adds a sample student, Siddharth Menon, marked absent today.
-// Safe to re-run. Nothing is sent to WhatsApp.
+// Safe to re-run: it replaces the sample chats. Nothing is sent to WhatsApp.
 // Run with the server running:  PSC_USER=... PSC_PASS=... node scripts/sample-whatsapp.mjs
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,11 +25,8 @@ async function call(method, p, body) {
 }
 
 const db = new DatabaseSync(path.join(root, 'data', 'psc.db'));
-if (db.prepare("SELECT COUNT(*) AS n FROM messages WHERE chat IS NOT NULL").get().n > 0) {
-  console.log('Sample chats already exist. Nothing added.');
-  db.close();
-  process.exit(0);
-}
+// Replace the sample chats with the current set. Only sample chats are removed.
+db.prepare('DELETE FROM messages WHERE chat IS NOT NULL').run();
 
 // Sample student and today's absence
 const data = await call('GET', 'data');
@@ -50,27 +47,23 @@ if (!sid) {
 }
 await call('PUT', 'attendance', { day: today, records: [{ person_type: 'student', person_id: sid, status: 'absent' }] });
 
-// Chats: "out" is you, "in" is someone else. Times are minutes ago.
+// Chats: "out" is you, "in" is someone else. Times are minutes ago. Only the topics agreed for the demo.
 const chats = {
   'parents-pattabhi': [
-    ['out', 'Class cancelled today due to rain. Sessions resume tomorrow at the usual time.', 200, 'You', [['Meera Bhat', '👍'], ['Divya Rao', '👍'], ['Lata Gowda', '🙏']]],
-    ['in', 'Thank you for the update. Will the U13 batch also be cancelled?', 190, 'Meera Bhat', []],
-    ['out', 'Yes, all batches are cancelled today, including U13.', 185, 'You', []],
-    ['in', 'Noted, thank you.', 170, 'Prakash Shetty', []],
-    ['out', 'Today is a holiday for all batches. No training, please plan accordingly.', 60, 'You', [['Divya Rao', '❤️'], ['Meera Bhat', '👍'], ['Prakash Shetty', '👍'], ['Lata Gowda', '😂']]],
-    ['in', 'Thanks! Enjoy the break everyone.', 50, 'Lata Gowda', [['You', '🙏']]],
+    ['out', 'Class cancelled today due to rain. Sessions resume tomorrow.', 200, 'You', [['Meera Bhat', '👍'], ['Divya Rao', '👍'], ['Lata Gowda', '🙏']]],
+    ['in', 'Thank you for the update.', 190, 'Meera Bhat', []],
+    ['out', 'Today is a holiday for all batches. No training.', 60, 'You', [['Divya Rao', '❤️'], ['Meera Bhat', '👍'], ['Prakash Shetty', '👍']]],
+    ['in', 'Thanks! Enjoy the break everyone.', 50, 'Lata Gowda', []],
   ],
   'coach-shridhar': [
-    ['in', 'Good morning. Is the U18 ground booked for Saturday 6 to 8 PM?', 480, 'Shridhar', []],
-    ['out', 'Yes, booked and confirmed for Saturday 6 to 8 PM.', 470, 'You', []],
-    ['in', 'Thanks. Can we settle the U18 kit money this week? ₹1,800 is pending from three families.', 120, 'Shridhar', []],
-    ['out', "I'll review the list and share it by evening. Please send the names.", 110, 'You', []],
-    ['in', 'Sure, sending the list now.', 100, 'Shridhar', []],
+    ['in', 'Good morning. Can we discuss the coaching money for this month?', 120, 'Shridhar', []],
+    ['out', "Yes, I'll share the details by evening.", 110, 'You', []],
+    ['in', 'Thanks. Please also check the pending kit money for U18.', 100, 'Shridhar', []],
   ],
   'parent-siddharth': [
-    ['in', 'Siddharth will be absent today, he has fever.', 240, 'Ananya Menon', []],
-    ['out', "Sorry to hear that. We'll mark him absent today. Please let us know when he's better.", 230, 'You', []],
-    ['in', 'I will come to pick up Siddharth late today around 7:30 PM. Is that okay?', 45, 'Ananya Menon', []],
+    ['in', 'Siddharth will be absent today.', 240, 'Ananya Menon', []],
+    ['out', "Thank you for letting us know. We'll mark him absent today.", 230, 'You', []],
+    ['in', 'I will come to pick up Siddharth late today, around 7:30 PM.', 45, 'Ananya Menon', []],
     ['out', "Yes, that's fine. We'll keep him in the office until then.", 40, 'You', []],
   ],
 };

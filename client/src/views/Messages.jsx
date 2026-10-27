@@ -105,7 +105,7 @@ export function Messages({ data, show, live, demo }) {
   return (
     <>
       <PageHeader title="WhatsApp" summary="Chats with parents and coaches">
-        <Status tone="muted">{demo ? 'Sample chats' : 'Demo chats: saved here, not sent to WhatsApp yet'}</Status>
+        <Status tone="muted">Sample chats: replies are scripted, nothing is sent to WhatsApp</Status>
       </PageHeader>
 
       <div className="wa">
