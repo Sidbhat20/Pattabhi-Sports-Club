@@ -491,3 +491,35 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
 /* Front of the card: the logo alone, on the right */
 .id-logo-only { position: absolute; right: 40px; top: 50%; transform: translateY(-50%); }
 .id-logo-only img { display: block; width: 150px; height: auto; }
+
+/* Phone pass: every tap target at least 44px tall, nothing running off the screen */
+@media (max-width: 860px) {
+  .btn { min-height: 44px; }
+  .btn-small { min-height: 44px; padding: 0 14px; font-size: 14px; }
+  .btn-text { min-height: 44px; padding: 0 12px; }
+  .chip { min-height: 44px; }
+  .segmented button { min-height: 44px; }
+  .name-link { display: inline-flex; align-items: center; min-height: 44px; }
+  .status { white-space: normal; max-width: 100%; }
+  .page-head { align-items: flex-start; }
+  .page-actions { width: 100%; }
+  .page-actions .btn, .page-actions .btn-small { flex: 1 1 auto; }
+  .month-nav { width: 100%; justify-content: space-between; }
+  .month-nav strong { min-width: 0; }
+  .toolbar > * { max-width: 100%; }
+  .toolbar input[type="date"] { flex: 1 1 100%; }
+  .wa-react-btn { min-width: 44px; min-height: 36px; font-size: 16px; }
+  .wa-picker button { min-width: 44px; min-height: 44px; }
+  .wa-send { min-height: 44px; }
+  .wa-row { min-height: 56px; }
+  .close-x { width: 44px; height: 44px; }
+  .id-preview { padding: 14px; }
+  .id-preview .card-faces { gap: 14px; }
+  .dialog .actions .btn { flex: 1 1 auto; }
+}
+@media (max-width: 860px) {
+  input, select, textarea { min-height: 44px; }
+  .wa-search { min-height: 44px; }
+  .wa-input textarea { min-height: 44px; }
+  .quiet { display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; }
+}
