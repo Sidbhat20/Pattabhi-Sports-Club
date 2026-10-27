@@ -217,7 +217,7 @@ mkdirSync(dataDir, { recursive: true });
 
 const server = spawn(process.execPath, [path.join(root, 'server.js')], {
   stdio: 'inherit',
-  env: { ...process.env, PSC_DEMO: '1', PSC_USER: 'demo', PSC_PASS: 'demo', PSC_DATA: dataDir, DEVICE_KEY: deviceKey, PORT: port },
+  env: { ...process.env, PSC_DEMO: '1', PSC_USER: 'demo', PSC_PASS: 'demo', PSC_DATA: dataDir, DEVICE_KEY: deviceKey, PORT: port, WA_TOKEN: '', WA_PHONE_ID: '', WA_APP_SECRET: '', WA_VERIFY_TOKEN: '' },
 });
 const stop = () => {
   server.kill();

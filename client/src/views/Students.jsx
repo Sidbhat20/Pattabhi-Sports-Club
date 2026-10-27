@@ -1,9 +1,12 @@
 import { activeStudents, batchOf, dueFor } from '../lib/data.js';
 import { generalMessage, rupees, thisMonth } from '../lib/format.js';
+import { useState } from 'react';
+import { StudentPreview } from '../components/IdCard.jsx';
 import { Button, PageHeader, Panel, Segmented, Status, Toolbar, Empty } from '../components/ui.jsx';
 import { Contact } from '../components/Contact.jsx';
 
 export function Students({ data, ui, setUi, openForm }) {
+  const [picked, setPicked] = useState(null);
   const q = ui.search.trim().toLowerCase();
   const month = thisMonth();
   const rows = data.students.filter(
@@ -52,9 +55,9 @@ export function Students({ data, ui, setUi, openForm }) {
                 return (
                   <tr key={s.id}>
                     <td data-label="Student">
-                      <a className="name-link" href={`#card/${s.id}`} target="_blank" rel="noopener">
+                      <button type="button" className="name-link" onClick={() => setPicked(s)}>
                         {s.name}
-                      </a>
+                      </button>
                     </td>
                     <td data-label="Batch">{batchOf(data, s.batch_id)?.name || 'No batch'}</td>
                     <td data-label="Parent">{s.guardian_name || <span className="muted">—</span>}</td>
@@ -80,6 +83,7 @@ export function Students({ data, ui, setUi, openForm }) {
         </div>
       </Panel>
 
+      <StudentPreview student={picked} data={data} onClose={() => setPicked(null)} />
     </>
   );
 }

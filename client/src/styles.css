@@ -469,3 +469,20 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
 .wa-reactions.out { justify-content: flex-end; }
 .wa-react-chip { background: #fff; border-radius: 99px; padding: 1px 6px; font-size: 12px; box-shadow: 0 1px 1px rgba(0, 0, 0, 0.12); }
 .wa-empty { margin: auto; color: #667781; font-size: 13px; }
+
+/* Card faces side by side. Each face keeps the card's shape at any width. */
+.card-faces { display: grid; grid-template-columns: repeat(2, minmax(0, 540px)); gap: 20px; }
+.id-face { width: 100%; height: auto; aspect-ratio: 540 / 340; }
+.id-preview { width: min(1100px, calc(100vw - 32px)); padding: 18px; }
+.preview-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-size: 15px; }
+.preview-actions { display: flex; gap: 8px; }
+@media (max-width: 1100px) { .card-faces { grid-template-columns: minmax(0, 1fr); } }
+/* Print the preview's card faces only */
+@media print {
+  body * { visibility: hidden; }
+  .id-preview, .id-preview * { visibility: visible; }
+  .id-preview { position: absolute; left: 0; top: 0; width: 100%; max-width: none; border: 0; box-shadow: none; padding: 0; margin: 0; overflow: visible; }
+  .id-preview .preview-top { display: none; }
+  .id-preview .card-faces { display: block; }
+  .id-preview .id-face { width: 85.6mm; height: 54mm; aspect-ratio: auto; break-after: page; page-break-after: always; box-shadow: none; border: 0; border-radius: 0; }
+}

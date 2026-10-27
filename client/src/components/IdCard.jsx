@@ -31,7 +31,7 @@ function Silhouette() {
   );
 }
 
-function Front({ student, batch }) {
+export function Front({ student, batch }) {
   return (
     <div className="id-face id-front">
       <div className="id-main">
@@ -59,7 +59,7 @@ function Front({ student, batch }) {
   );
 }
 
-function Back({ student, data }) {
+export function Back({ student, data }) {
   const month = thisMonth();
   const due = dueFor(data, student, month);
   const paid = data.payments.filter((p) => p.student_id === student.id).reduce((t, p) => t + p.amount, 0);
@@ -92,7 +92,35 @@ function Back({ student, data }) {
   );
 }
 
-// The card page opened in a new tab: front and back, with a print button for ID-card size.
+// Preview on the same page: front and back side by side, opened from a student's name.
+export function StudentPreview({ student, data, onClose }) {
+  const dialogRef = { current: null };
+  return (
+    <dialog className="dialog id-preview" onClose={onClose} onCancel={onClose} ref={(el) => {
+      dialogRef.current = el;
+      if (el && student && !el.open) el.showModal();
+      if (el && !student && el.open) el.close();
+    }}>
+      {student && (
+        <>
+          <div className="preview-top card-toolbar">
+            <strong>{student.name}</strong>
+            <span className="preview-actions">
+              <Button variant="secondary" size="small" onClick={() => window.print()}>Print</Button>
+              <Button variant="text" size="small" onClick={() => dialogRef.current.close()}>Close</Button>
+            </span>
+          </div>
+          <div className="card-faces">
+            <Front student={student} batch={batchOf(data, student.batch_id)?.name || 'No batch'} />
+            <Back student={student} data={data} />
+          </div>
+        </>
+      )}
+    </dialog>
+  );
+}
+
+// The card page: front and back side by side, with a print button for ID-card size.
 export function IdCardPage({ data, id }) {
   const student = data.students.find((s) => s.id === Number(id));
   if (!student) {

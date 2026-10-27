@@ -486,7 +486,7 @@ const messagesApi = async (req, res, url) => {
   }
 
   let status = 'demo';
-  if (!chat && WA_TOKEN && WA_PHONE_ID) {
+  if (!chat && !DEMO && WA_TOKEN && WA_PHONE_ID) {
     const r = await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
