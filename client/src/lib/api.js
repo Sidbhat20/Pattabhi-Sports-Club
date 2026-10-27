@@ -4,7 +4,7 @@ export async function api(method, path, body) {
   if (MOCK) return mockRequest(method, path, body);
   const res = await fetch(`/api/${path}`, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
+    headers: method === 'GET' ? {} : { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   });
   const json = await res.json().catch(() => ({}));

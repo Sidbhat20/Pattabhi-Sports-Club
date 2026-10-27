@@ -542,6 +542,17 @@ createServer(async (req, res) => {
     res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="PSC Dashboard"' });
     return res.end('Login required');
   }
+  // CSRF guard: the browser login is sent automatically, so state-changing API calls must come from this site and send JSON.
+  // Plain HTML forms cannot send application/json, and cross-site fetches with it trigger a preflight that is refused.
+  if (['POST', 'PUT', 'DELETE'].includes(req.method) && url.pathname.startsWith('/api/') && !OPEN_PATHS.has(url.pathname)) {
+    const origin = req.headers.origin;
+    if (req.headers['sec-fetch-site'] === 'cross-site' || (origin && new URL(origin).host !== req.headers.host)) {
+      return send(res, 403, { error: 'Cross-site request blocked' });
+    }
+    if (!String(req.headers['content-type'] || '').startsWith('application/json')) {
+      return send(res, 415, { error: 'Requests must be JSON' });
+    }
+  }
   try {
     if (url.pathname.startsWith('/api/')) await api(req, res, url);
     else await serveStatic(res, url.pathname);
