@@ -533,3 +533,13 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
   .nav-item { flex: 0 0 auto; min-width: 74px; flex-direction: column; gap: 2px; font-size: 11px; line-height: 1.2; padding: 6px 8px; }
   .nav-item svg { width: 20px; height: 20px; }
 }
+
+/* Ask screen */
+.ask-log { display: grid; gap: 10px; max-height: 420px; overflow-y: auto; padding: 4px 2px 12px; }
+.ask-msg { max-width: 85%; padding: 10px 12px; border-radius: 10px; font-size: 14px; line-height: 1.45; }
+.ask-msg p { margin: 0; white-space: pre-line; }
+.ask-msg small { display: block; margin-top: 6px; color: var(--ink-2); }
+.ask-msg.bot { background: #f0f0ed; justify-self: start; }
+.ask-msg.you { background: var(--rail); color: #fff; justify-self: end; }
+.ask-input { display: flex; gap: 8px; margin-top: 12px; }
+.ask-input input { flex: 1; min-width: 0; }

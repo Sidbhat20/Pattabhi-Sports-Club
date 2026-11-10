@@ -13,8 +13,9 @@ import { Fees } from './views/Fees.jsx';
 import { Finance } from './views/Finance.jsx';
 import { Messages } from './views/Messages.jsx';
 import { Setup } from './views/Setup.jsx';
+import { Ask } from './views/Ask.jsx';
 
-const VIEWS = { home: Home, students: Students, attendance: Attendance, fees: Fees, finance: Finance, whatsapp: Messages, setup: Setup };
+const VIEWS = { home: Home, students: Students, attendance: Attendance, fees: Fees, finance: Finance, whatsapp: Messages, ask: Ask, setup: Setup };
 
 const currentView = () => {
   const v = window.location.hash.slice(1);

@@ -9,6 +9,7 @@ export const NAV = [
   { key: 'fees', label: 'Fees' },
   { key: 'finance', label: 'Finance' },
   { key: 'whatsapp', label: 'WhatsApp', icon: true },
+  { key: 'ask', label: 'Ask' },
   { key: 'setup', label: 'Setup' },
 ];
 

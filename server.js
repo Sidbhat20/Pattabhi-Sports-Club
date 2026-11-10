@@ -294,6 +294,7 @@ const api = async (req, res, url) => {
   if (url.pathname === '/api/biometric/punch') return punch(req, res);
   if (url.pathname === '/api/whatsapp/webhook') return webhook(req, res, url);
   if (url.pathname === '/api/messages') return messagesApi(req, res, url);
+  if (url.pathname === '/api/ask') return askApi(req, res);
   const reactMatch = /^\/api\/messages\/(\d+)\/react$/.exec(url.pathname);
   if (reactMatch) return messageReact(req, res, Number(reactMatch[1]));
   if (url.pathname === '/api/punches' && req.method === 'GET') {
@@ -563,6 +564,68 @@ const messageReact = async (req, res, id) => {
   db.prepare('UPDATE messages SET reactions = ? WHERE id = ?').run(JSON.stringify(list), id);
   broadcast({ type: 'message', direction: row.direction, phone: row.phone, chat: row.chat });
   send(res, 200, messageRow(db.prepare('SELECT * FROM messages WHERE id = ?').get(id)));
+};
+
+// AI assistant. Only summary facts go to the model: no medical notes, no dates of birth, phone numbers cut to the last four digits.
+const OPENAI_KEY = process.env.OPENAI_API_KEY;
+const clubFacts = () => {
+  const month = new Date().toLocaleDateString('en-CA').slice(0, 7);
+  const batches = db.prepare('SELECT id, name, monthly_fee FROM batches').all();
+  const coaches = db.prepare("SELECT name, monthly_pay FROM coaches WHERE status = 'active'").all();
+  const students = db
+    .prepare(
+      `SELECT s.name, s.batch_id, s.discount, s.joined_on, s.guardian_name, s.guardian_phone,
+              (SELECT COALESCE(SUM(p.amount), 0) FROM payments p WHERE p.student_id = s.id AND p.for_month = ?) AS paid
+       FROM students s WHERE s.status = 'active' ORDER BY s.name`,
+    )
+    .all(month);
+  const methods = db
+    .prepare('SELECT method, COUNT(*) AS n, SUM(amount) AS total FROM payments WHERE for_month = ? GROUP BY method')
+    .all(month);
+  const expenses = db
+    .prepare('SELECT category, SUM(amount) AS total FROM expenses WHERE day LIKE ? GROUP BY category')
+    .all(`${month}%`);
+  const byId = new Map(batches.map((b) => [b.id, b]));
+  return [
+    `Month: ${month}`,
+    `Batches: ${batches.map((b) => `${b.name} fee ${b.monthly_fee}`).join('; ')}`,
+    `Coaches: ${coaches.map((c) => `${c.name} pay ${c.monthly_pay}`).join('; ')}`,
+    'Students (name | batch | fee this month | paid this month | parent | phone):',
+    ...students.map((r) => {
+      const b = byId.get(r.batch_id);
+      const fee = Math.max(0, (b?.monthly_fee || 0) - (r.discount || 0));
+      const phone = r.guardian_phone ? `ending ${r.guardian_phone.slice(-4)}` : 'none';
+      return `${r.name} | ${b?.name || 'no batch'} | ${fee} | ${r.paid} | ${r.guardian_name || 'none'} | ${phone}`;
+    }),
+    `Payments this month by method: ${methods.map((m) => `${m.method || 'unknown'} ${m.n} payments ${m.total}`).join('; ') || 'none'}`,
+    `Expenses this month: ${expenses.map((e) => `${e.category} ${e.total}`).join('; ') || 'none'}`,
+  ].join('\n');
+};
+
+const askApi = async (req, res) => {
+  if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
+  const body = await readBody(req);
+  const question = text(300)(body.question ?? '');
+  if (!question) fail('Write a question first');
+  if (!OPENAI_KEY) throw new HttpError(503, 'The AI is not connected. Add OPENAI_API_KEY on the server.');
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'You answer questions about Pattabhi Sports Club. Use only the facts given. If the facts do not contain the answer, say so. Keep answers short and plain.',
+        },
+        { role: 'user', content: `Facts:\n${clubFacts()}\n\nQuestion: ${question}` },
+      ],
+    }),
+  });
+  const json = await r.json().catch(() => ({}));
+  // Never pass the provider's error text on: it can echo part of the key.
+  if (!r.ok) throw new HttpError(502, 'The AI did not answer. Check the OPENAI_API_KEY on the server.');
+  send(res, 200, { answer: json.choices?.[0]?.message?.content?.trim() || 'No answer' });
 };
 
 const types = {
