@@ -1,28 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
+import { answerFor } from '../lib/ask.js';
 import { Button, PageHeader, Status } from '../components/ui.jsx';
 
 const logo = '/logo.png';
-const SORRY = "Sorry, I can't answer that. This is a demo version and is not production level yet.";
-const QUESTION_START = /^(what|who|when|where|why|how|which|is|are|am|do|does|did|can|could|will|would|should|tell|show|find|list|give|explain)\b/i;
 
-// Demo replies: questions get the sorry message, greetings and thanks get a normal answer.
-export function replyTo(text) {
-  const t = text.trim();
-  const lower = t.toLowerCase();
-  if (/\?$/.test(t) || QUESTION_START.test(t)) return SORRY;
-  if (/^(hi|hii|hello|hey|good (morning|afternoon|evening))\b/.test(lower)) return 'Hello! Nice to meet you. I am the club assistant demo.';
-  if (/thank/.test(lower)) return "You're welcome!";
-  if (/^(bye|goodbye|see you|good night)\b/.test(lower)) return 'Goodbye! Have a great day.';
-  return 'Got it.';
-}
-
-export function Ask() {
+export function Ask({ data }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
   const [typing, setTyping] = useState(false);
   const logRef = useRef(null);
   const boxRef = useRef(null);
-  const timer = useRef(null);
 
   useEffect(() => {
     const el = logRef.current;
@@ -37,33 +24,27 @@ export function Ask() {
     }
   }, [text]);
 
-  useEffect(() => () => clearTimeout(timer.current), []);
-
-  const send = () => {
+  const send = async () => {
     const t = text.trim();
     if (!t || typing) return;
     setMessages((m) => [...m, { id: Date.now(), from: 'you', text: t }]);
     setText('');
     setTyping(true);
-    const reply = replyTo(t);
-    timer.current = setTimeout(() => {
-      setMessages((m) => [...m, { id: Date.now() + 1, from: 'bot', text: reply }]);
-      setTyping(false);
-    }, 600 + Math.min(reply.length * 10, 800));
-  };
-
-  const newChat = () => {
-    clearTimeout(timer.current);
-    setMessages([]);
+    let reply;
+    try {
+      reply = await answerFor(t, data);
+    } catch {
+      reply = "Sorry, I couldn't load that just now. Please try again.";
+    }
+    setMessages((m) => [...m, { id: Date.now() + 1, from: 'bot', text: reply }]);
     setTyping(false);
-    setText('');
   };
 
   return (
     <>
-      <PageHeader title="Club assistant" summary="Chat with the club assistant">
+      <PageHeader title="Club assistant" summary="Ask about the club's students, fees, coaches and money">
         <Status tone="muted">Demo</Status>
-        <Button variant="secondary" size="small" onClick={newChat}>New chat</Button>
+        <Button variant="secondary" size="small" onClick={() => { setMessages([]); setText(''); setTyping(false); }}>New chat</Button>
       </PageHeader>
 
       <div className="gpt">
@@ -72,7 +53,7 @@ export function Ask() {
             <div className="gpt-empty">
               <img src={logo} alt="" />
               <h2>How can I help?</h2>
-              <p>Say hello, or type a message below.</p>
+              <p>Ask about a student, a batch, fees, coach pay, spending, income or attendance.</p>
             </div>
           )}
           {messages.map((m) => (
@@ -128,7 +109,7 @@ export function Ask() {
               </svg>
             </button>
           </form>
-          <p className="gpt-foot">Demo only. Answers are not connected to the club's data yet.</p>
+          <p className="gpt-foot">Demo: answers come from the club's sample data.</p>
         </div>
       </div>
     </>
