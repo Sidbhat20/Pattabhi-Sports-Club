@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { answer, EXAMPLES } from '../lib/ask.js';
-import { attendanceForMonth } from '../lib/api.js';
+import { api, attendanceForMonth } from '../lib/api.js';
 import { today } from '../lib/format.js';
 
 // Long answers are laid out as rows: a heading, then "label: value" lines, then an "and N more" note.
@@ -31,8 +31,10 @@ function Answer({ text }) {
 import { Button, PageHeader, Status } from '../components/ui.jsx';
 
 const logo = '/logo.png';
+const YES = /^(yes|yep|yeah|y|ok|okay|confirm|do it|haan|ha|sure|go ahead)$/i;
+const NO = /^(no|nope|n|cancel|stop|nahi)$/i;
 
-export function Ask({ data }) {
+export function Ask({ data, refresh }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
   const [typing, setTyping] = useState(false);
@@ -52,19 +54,44 @@ export function Ask({ data }) {
     }
   }, [text]);
 
+  const push = (msg) => setMessages((m) => [...m, { id: `${Date.now()}-${Math.random()}`, ...msg }]);
+  const settle = (id) => setMessages((m) => m.map((x) => (x.id === id ? { ...x, done: true } : x)));
+  const pending = [...messages].reverse().find((m) => m.from === 'bot' && m.confirm && !m.done);
+
+  const runConfirm = async (msg) => {
+    settle(msg.id);
+    setTyping(true);
+    let result;
+    try {
+      result = await msg.confirm.run(api);
+      if (refresh) await refresh();
+    } catch (e) {
+      result = `That did not work, so nothing was changed. ${e.message || ''}`.trim();
+    }
+    push({ from: 'bot', text: result });
+    setTyping(false);
+  };
+
+  const cancel = (msg) => {
+    settle(msg.id);
+    push({ from: 'bot', text: 'Cancelled. Nothing was changed.' });
+  };
+
   const send = async (preset) => {
     const t = (typeof preset === 'string' ? preset : text).trim();
     if (!t || typing) return;
-    setMessages((m) => [...m, { id: Date.now(), from: 'you', text: t }]);
+    push({ from: 'you', text: t });
     setText('');
+    if (pending && YES.test(t)) return runConfirm(pending);
+    if (pending && NO.test(t)) return cancel(pending);
     setTyping(true);
     let res;
     try {
       res = await answer(t, { data, now: new Date(), today: today(), loadMonth: attendanceForMonth });
     } catch {
-      res = { text: "Something went wrong while looking that up. Please try again." };
+      res = { text: 'Something went wrong while looking that up. Please try again.' };
     }
-    setMessages((m) => [...m, { id: Date.now() + 1, from: 'bot', text: res.text, chips: res.chips }]);
+    push({ from: 'bot', text: res.text, chips: res.chips, confirm: res.confirm });
     setTyping(false);
   };
 
@@ -100,6 +127,16 @@ export function Ask({ data }) {
               )}
               <div className="gpt-bubble">
                 <Answer text={m.text} />
+                {m.confirm && !m.done && (
+                  <div className="gpt-chips gpt-chips-inline">
+                    <button type="button" className="gpt-chip gpt-chip-yes" onClick={() => runConfirm(m)}>
+                      {m.confirm.yes}
+                    </button>
+                    <button type="button" className="gpt-chip" onClick={() => cancel(m)}>
+                      Cancel
+                    </button>
+                  </div>
+                )}
                 {m.chips && (
                   <div className="gpt-chips gpt-chips-inline">
                     {m.chips.map((c) => (
@@ -155,7 +192,7 @@ export function Ask({ data }) {
               </svg>
             </button>
           </form>
-          <p className="gpt-foot">Demo: answers come from the club's sample data.</p>
+          <p className="gpt-foot">{pending ? 'Reply yes or no, or tap a button above.' : "Demo: answers and changes use the club's sample data."}</p>
         </div>
       </div>
     </>

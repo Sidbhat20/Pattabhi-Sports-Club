@@ -105,7 +105,7 @@ describe('club assistant, against the sample data', () => {
   });
 
   it('a question it cannot answer offers example questions instead of a bare sorry', async () => {
-    const r = await ask('can we send a message');
+    const r = await ask('what is the weather like');
     expect(r.chips.length).toBe(4);
     expect(r.text).not.toMatch(/sorry/i);
   });
@@ -113,5 +113,62 @@ describe('club assistant, against the sample data', () => {
   it('an unknown full name is reported, not matched to someone else', async () => {
     const r = await ask('How much does Zara Quazi owe?');
     expect(r.text).toMatch(/could not find a student called Zara Quazi/);
+  });
+});
+
+describe('the assistant can do things, but only after you confirm', () => {
+  // A student whose first name is shared with nobody, so the test is not about ambiguity.
+  const unique = activeStudents.find((s) => activeStudents.filter((x) => x.name.split(' ')[0] === s.name.split(' ')[0]).length === 1);
+  const first = unique.name.split(' ')[0];
+  const recorder = () => {
+    const calls = [];
+    const write = async (method, path, body) => {
+      calls.push({ method, path, body });
+      return { ok: true };
+    };
+    return { calls, write };
+  };
+
+  it('mark <name> absent asks first, writes nothing, then marks the attendance on confirm', async () => {
+    const r = await ask(`mark ${first} absent`);
+    const w = recorder();
+    expect(r.text).toContain(`Mark ${unique.name} as absent`);
+    expect(r.confirm).toBeTruthy();
+    expect(w.calls).toHaveLength(0);
+    const out = await r.confirm.run(w.write);
+    expect(w.calls[0]).toMatchObject({ method: 'PUT', path: 'attendance' });
+    expect(w.calls[0].body.records[0]).toMatchObject({ person_type: 'student', person_id: unique.id, status: 'absent' });
+    expect(out).toContain('marked absent');
+  });
+
+  it('record payment for <name> 500 upi records the amount and method for this month', async () => {
+    const r = await ask(`record payment for ${first} 500 upi`);
+    const w = recorder();
+    expect(r.text).toContain('Record ₹500 paid by UPI');
+    await r.confirm.run(w.write);
+    expect(w.calls[0]).toMatchObject({ method: 'POST', path: 'payments' });
+    expect(w.calls[0].body).toMatchObject({ student_id: String(unique.id), amount: 500, method: 'UPI', for_month: '2026-11' });
+  });
+
+  it('add expense 500 for equipment records an Equipment expense', async () => {
+    const r = await ask('add expense 500 for equipment');
+    const w = recorder();
+    expect(r.text).toContain('Add an expense of ₹500 under Equipment');
+    await r.confirm.run(w.write);
+    expect(w.calls[0]).toMatchObject({ method: 'POST', path: 'expenses' });
+    expect(w.calls[0].body).toMatchObject({ category: 'Equipment', amount: 500 });
+  });
+
+  it('send a message to the parents group saves it to that chat on confirm', async () => {
+    const r = await ask('send a message to the parents group: class cancelled today');
+    const w = recorder();
+    expect(r.text).toContain('class cancelled today');
+    await r.confirm.run(w.write);
+    expect(w.calls[0]).toMatchObject({ method: 'POST', path: 'messages' });
+    expect(w.calls[0].body).toEqual({ chat: 'parents-pattabhi', body: 'class cancelled today' });
+  });
+
+  it('today on its own answers with today\'s attendance', async () => {
+    expect((await ask('today')).text).toContain('present');
   });
 });

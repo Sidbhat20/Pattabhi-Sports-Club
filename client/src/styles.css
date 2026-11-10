@@ -585,3 +585,4 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
 }
 @media (max-width: 860px) { .page-actions .btn-small { flex: 0 0 auto; } }
 .gpt-chips-inline { justify-content: flex-start; margin-top: 10px; max-width: none; }
+.gpt-chip-yes { background: var(--maroon); border-color: var(--maroon); color: #fff; }

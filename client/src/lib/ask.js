@@ -22,6 +22,10 @@ const WORDS = {
   salary: ['salary', 'salaries'],
   schedule: ['schedule', 'timing', 'timings', 'timetable'],
   count: ['many', 'count', 'total', 'number'],
+  record: ['record', 'recorded', 'recording'],
+  send: ['send', 'sent'],
+  message: ['message', 'messages', 'msg'],
+  add: ['add'],
   list: ['list', 'names', 'show'],
   upi: ['upi'],
   cash: ['cash'],
@@ -32,6 +36,118 @@ const STOP = new Set([
   'give', 'detail', 'details', 'status', 'me', 'we', 'our', 'do', 'have', 'with', 'from', 'is', 'was', 'did', 'by', 'on', 'at', 'it', 'that',
   'there', 'any', 'all', 'some', 'money', 'amount', 'balance', 'batch', 'batches', 'today', 'now', 'have', 'tell', 'find', 'show', 'give',
 ]);
+
+const CATEGORY_WORDS = [
+  [/court|rent|hall|ground/, 'Court rent'],
+  [/coach/, 'Coach pay'],
+  [/equip|ball|cone|kit/, 'Equipment'],
+  [/travel|bus|fuel|transport|tournament/, 'Travel'],
+  [/water|snack|tea/, 'Water & snacks'],
+  [/electric|utilit|power/, 'Utilities'],
+  [/market|advert|flex|poster/, 'Marketing'],
+];
+const categoryIn = (s) => (CATEGORY_WORDS.find(([re]) => re.test(s)) || [null, 'Other'])[1];
+// A plain amount in the question (years and batch names are not amounts).
+const numberIn = (s) => {
+  const found = s.split(' ').filter((t) => /^\d{2,6}$/.test(t) && !/^20\d{2}$/.test(t));
+  return found.length ? Number(found[0]) : null;
+};
+// Which action the message asks for, if any. Actions always ask for confirmation first.
+const actionIntent = (tokens) => {
+  if (has(tokens, 'send') && has(tokens, 'message')) return 'message';
+  if (tokens.some((t) => ['mark', 'marks', 'marked'].includes(t))) return 'mark';
+  if (has(tokens, 'record')) return 'payment';
+  if (has(tokens, 'add') && has(tokens, 'expense')) return 'expense';
+  return null;
+};
+
+// Builds the confirmation for an action. Nothing is written here; run() does the write when the user confirms.
+function actionAnswer(kind, c) {
+  const { question, stripped, tokens, data, period, ctx, studentHits, coachHits } = c;
+  if (kind === 'mark') {
+    const status = ['present', 'late', 'absent'].find((s) => tokens.includes(s));
+    if (!status) return { text: 'Should I mark them present, late or absent? For example: "mark Arjun absent".' };
+    const person = studentHits[0] ? { type: 'student', p: studentHits[0] } : coachHits[0] ? { type: 'coach', p: coachHits[0] } : null;
+    if (!person) return { text: 'Who should I mark? For example: "mark Arjun absent today".' };
+    const { type, p } = person;
+    return {
+      text: `Mark ${p.name} as ${status} for today, ${dayLabel(ctx.today)}?`,
+      confirm: {
+        yes: 'Yes, mark them',
+        run: async (write) => {
+          await write('PUT', 'attendance', { day: ctx.today, records: [{ person_type: type, person_id: p.id, status }] });
+          return `Done. ${p.name} is marked ${status} for today.`;
+        },
+      },
+    };
+  }
+  if (kind === 'payment') {
+    const s = studentHits[0];
+    if (!s) return { text: 'Which student paid? For example: "record payment for Arjun 1500 UPI".' };
+    const m = period.months[0];
+    const due = dueFor(data, s, m).balance;
+    const amount = numberIn(stripped) ?? due;
+    if (!amount) return { text: `${s.name} has nothing owing for ${monthLabel(m)}, so there is nothing to record.` };
+    const found = /\bupi\b/.test(stripped) ? 'UPI' : /\bcash\b/.test(stripped) ? 'Cash' : /bank/.test(stripped) ? 'Bank transfer' : /\bcard\b/.test(stripped) ? 'Card' : null;
+    const method = found || 'Cash';
+    const note = found ? '' : ' No method was given, so it will be recorded as Cash.';
+    return {
+      text: `Record ${rupees(amount)} paid by ${method} from ${s.name} for ${monthLabel(m)}?${note}`,
+      confirm: {
+        yes: 'Yes, record it',
+        run: async (write) => {
+          await write('POST', 'payments', { student_id: String(s.id), amount, for_month: m, paid_on: ctx.today, method, note: '' });
+          const left = Math.max(0, due - amount);
+          return `Recorded ${rupees(amount)} from ${s.name} (${method}). ${left ? `${rupees(left)} still to pay for ${monthLabel(m)}.` : `Fully paid for ${monthLabel(m)}.`}`;
+        },
+      },
+    };
+  }
+  if (kind === 'expense') {
+    const amount = numberIn(stripped);
+    if (!amount) return { text: 'How much was the expense? For example: "add expense 500 for equipment".' };
+    const category = categoryIn(stripped);
+    return {
+      text: `Add an expense of ${rupees(amount)} under ${category}, dated ${dayLabel(ctx.today)}?`,
+      confirm: {
+        yes: 'Yes, add it',
+        run: async (write) => {
+          await write('POST', 'expenses', { day: ctx.today, category, amount, note: '', coach_id: '' });
+          return `Added ${rupees(amount)} under ${category}.`;
+        },
+      },
+    };
+  }
+  // message: only the three demo chats exist
+  let chat = null;
+  let who = null;
+  if (studentHits[0]?.name.startsWith('Siddharth')) { chat = 'parent-siddharth'; who = 'the parent of Siddharth'; }
+  else if (coachHits[0]?.name.startsWith('Shridhar')) { chat = 'coach-shridhar'; who = 'Shridhar'; }
+  else if (/\bparents\b|\bgroup\b|pattabhi/.test(stripped)) { chat = 'parents-pattabhi'; who = "the parents' group"; }
+  if (!chat) {
+    return {
+      text: "I can message the parents' group, Shridhar, or the parent of Siddharth. Which one?",
+      chips: [
+        { label: "Parents' group", send: 'Send a message to the parents group: ' },
+        { label: 'Shridhar', send: 'Send a message to Shridhar: ' },
+        { label: 'Parent of Siddharth', send: 'Send a message to the parent of Siddharth: ' },
+      ],
+    };
+  }
+  const m = question.match(/:\s*(.+)$/) || question.match(/\b(?:saying|that says|saying that|that)\s+(.+)$/i);
+  const body = m ? m[1].trim() : '';
+  if (!body) return { text: `Type the whole message, for example: "Send a message to ${who}: class cancelled today."` };
+  return {
+    text: `Send this to ${who}: "${body}"? It is saved in that chat. In this demo it is not sent to WhatsApp.`,
+    confirm: {
+      yes: 'Yes, send it',
+      run: async (write) => {
+        await write('POST', 'messages', { chat, body });
+        return `Saved in the chat with ${who}.`;
+      },
+    },
+  };
+}
 
 // Edit distance, so small typos still match.
 const lev = (a, b) => {
@@ -337,6 +453,9 @@ export async function answer(question, ctx) {
       })),
     };
   }
+  const act = actionIntent(tokens);
+  if (act) return actionAnswer(act, { question, stripped, tokens, data, period, ctx, studentHits, coachHits });
+  if (stripped === 'today') return todayAttendance(ctx, data, null);
   if (studentHits.length === 1) return studentAnswer(studentHits[0], data, period, tokens, stripped);
   if (coachHits.length >= 1) return coachAnswer(coachHits[0], ctx, period, tokens, stripped);
 

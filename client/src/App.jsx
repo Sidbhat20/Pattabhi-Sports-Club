@@ -97,7 +97,7 @@ export default function App() {
     <div className="app">
       <Sidebar view={view} live={live.connected} demo={info.demo} />
       <main className="main">
-        <View data={data} ui={ui} setUi={setUi} openForm={openForm} remove={remove} show={show} live={live} demo={info.demo} />
+        <View data={data} ui={ui} setUi={setUi} openForm={openForm} remove={remove} show={show} live={live} demo={info.demo} refresh={refresh} />
       </main>
       <FormDialog
         form={form}
