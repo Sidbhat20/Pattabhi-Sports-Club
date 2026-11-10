@@ -1,5 +1,33 @@
 import { useEffect, useRef, useState } from 'react';
 import { answerFor } from '../lib/ask.js';
+
+const STARTERS = ['Who is yet to pay?', 'Tell me about U16', 'How is Shridhar doing?', 'What did we spend this month?'];
+
+// Long answers are laid out as rows: a heading, then "label: value" lines, then an "and N more" note.
+function Answer({ text }) {
+  const lines = text.split('\n');
+  const isList = lines.length > 2 && lines.slice(1).some((l) => l.includes(': ') || /^and \d+ more$/.test(l));
+  if (!isList) return text.split('\n').map((l, i) => <p key={i}>{l}</p>);
+  const [head, ...rest] = lines;
+  return (
+    <>
+      <p className="gpt-head">{head}</p>
+      <ul className="gpt-list">
+        {rest.map((l, i) => {
+          if (/^and \d+ more$/.test(l)) return <li key={i} className="gpt-more">{l}</li>;
+          const k = l.lastIndexOf(': ');
+          if (k < 0) return <li key={i}>{l}</li>;
+          return (
+            <li key={i}>
+              <span>{l.slice(0, k)}</span>
+              <b>{l.slice(k + 2)}</b>
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
 import { Button, PageHeader, Status } from '../components/ui.jsx';
 
 const logo = '/logo.png';
@@ -24,8 +52,8 @@ export function Ask({ data }) {
     }
   }, [text]);
 
-  const send = async () => {
-    const t = text.trim();
+  const send = async (preset) => {
+    const t = (typeof preset === 'string' ? preset : text).trim();
     if (!t || typing) return;
     setMessages((m) => [...m, { id: Date.now(), from: 'you', text: t }]);
     setText('');
@@ -54,6 +82,13 @@ export function Ask({ data }) {
               <img src={logo} alt="" />
               <h2>How can I help?</h2>
               <p>Ask about a student, a batch, fees, coach pay, spending, income or attendance.</p>
+              <div className="gpt-chips">
+                {STARTERS.map((q) => (
+                  <button key={q} type="button" className="gpt-chip" onClick={() => send(q)}>
+                    {q}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           {messages.map((m) => (
@@ -63,7 +98,9 @@ export function Ask({ data }) {
                   <img src={logo} alt="" />
                 </span>
               )}
-              <div className="gpt-bubble">{m.text}</div>
+              <div className="gpt-bubble">
+                <Answer text={m.text} />
+              </div>
             </div>
           ))}
           {typing && (

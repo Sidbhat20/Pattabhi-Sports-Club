@@ -566,3 +566,21 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
   .gpt-bubble { max-width: 86%; }
   .gpt-log { padding: 16px 12px; }
 }
+
+/* Club assistant: answer layout and suggestions */
+.gpt-bubble p { margin: 0; }
+.gpt-bubble p + p { margin-top: 2px; }
+.gpt-head { font-weight: 600; margin: 0 0 8px !important; }
+.gpt-list { list-style: none; margin: 0; padding: 0; min-width: 260px; }
+.gpt-list li { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 7px 0; border-bottom: 1px solid #e2e2de; }
+.gpt-list li:last-child { border-bottom: 0; }
+.gpt-list li b { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.gpt-list li.gpt-more { display: block; color: var(--ink-2); font-size: 13px; padding-top: 8px; border-bottom: 0; }
+.gpt-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 18px; max-width: 560px; }
+.gpt-chip { min-height: 36px; padding: 6px 14px; border: 1px solid var(--rule); border-radius: 99px; background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; cursor: pointer; }
+.gpt-chip:hover { border-color: var(--ink-2); }
+@media (max-width: 860px) {
+  .gpt-list { min-width: 0; }
+  .gpt-chip { min-height: 44px; }
+}
+@media (max-width: 860px) { .page-actions .btn-small { flex: 0 0 auto; } }

@@ -12,6 +12,30 @@ export const SUGGESTIONS = [
 ];
 
 // Answers computed from the club data on screen. No AI is involved.
+// Edit distance between two words, so "shridar" still finds "Shridhar".
+const lev = (a, b) => {
+  const dp = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = dp[0];
+    dp[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = dp[j];
+      dp[j] = a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[j], dp[j - 1]);
+      prev = tmp;
+    }
+  }
+  return dp[b.length];
+};
+const wordsOf = (t) => t.split(/[^a-z]+/).filter(Boolean);
+// True when the question names this person, allowing small typos.
+const namedIn = (t, name) => {
+  const n = name.toLowerCase();
+  if (t.includes(n)) return true;
+  const first = n.split(' ')[0];
+  const max = first.length >= 7 ? 2 : 1;
+  return wordsOf(t).some((w) => w.length >= 4 && lev(w, first) <= max);
+};
+
 export function localAnswer(question, data) {
   const m = thisMonth();
   const t = question.toLowerCase();
@@ -26,7 +50,7 @@ export function localAnswer(question, data) {
   const typedName = runs.map((r) => r.split(' ').filter((w) => !COMMAND_WORDS.test(w)).join(' ')).find((n) => n.includes(' '));
   const fullMatch = active.find((s) => t.includes(s.name.toLowerCase()));
   if (typedName && !fullMatch) return `I could not find a student called ${typedName}. Check the spelling or search by first name.`;
-  const student = fullMatch || active.find((s) => t.split(/\s+/).includes(s.name.toLowerCase().split(' ')[0]));
+  const student = fullMatch || active.find((s) => namedIn(t, s.name));
   if (student) {
     const due = dueFor(data, student, m);
     const paid = data.payments.filter((p) => p.student_id === student.id && p.for_month === m).reduce((x, p) => x + p.amount, 0);
@@ -83,12 +107,10 @@ export function localAnswer(question, data) {
   return null;
 }
 
-// Coach attendance: this month, and the last six months. Present and late both count as attended.
+// A coach named in the question: attendance this month, last six months, and pay this month.
 export async function attendanceAnswer(question, data) {
   const t = question.toLowerCase();
-  if (!/attend|present|absent|came|sessions?/.test(t)) return null;
-  const active = data.coaches.filter((c) => c.status === 'active');
-  const coach = active.find((c) => t.includes(c.name.toLowerCase())) || active.find((c) => t.split(/\s+/).includes(c.name.toLowerCase().split(' ')[0]));
+  const coach = data.coaches.find((c) => c.status === 'active' && namedIn(t, c.name));
   if (!coach) return null;
   const m = thisMonth();
   const months = Array.from({ length: 6 }, (_, i) => shiftMonth(m, -i));
@@ -107,9 +129,22 @@ export async function attendanceAnswer(question, data) {
       thisTotal = days.size;
     }
   });
-  if (!total) return `No coach attendance is recorded for ${coach.name} yet.`;
-  const thisLine = thisTotal ? `${thisCame} of ${thisTotal} sessions` : `no sessions recorded yet`;
-  return `${coach.name} this month (${monthLabel(m)}): ${thisLine}.\nLast six months: ${came} of ${total} sessions (${Math.round((came / total) * 100)}%).`;
+  const thisLine = thisTotal ? `${thisCame} of ${thisTotal} sessions` : 'no sessions recorded yet';
+  const sixLine = total ? `${came} of ${total} sessions (${Math.round((came / total) * 100)}%)` : 'no sessions recorded yet';
+  const paid = coachPaidIn(data, coach.id, m);
+  const payLine = !coach.monthly_pay
+    ? 'no monthly pay set'
+    : paid >= coach.monthly_pay
+      ? 'paid in full'
+      : paid > 0
+        ? `${rupees(paid)} of ${rupees(coach.monthly_pay)} paid`
+        : 'not paid yet';
+  return [
+    `${coach.name}, ${monthLabel(m)}`,
+    `Attended this month: ${thisLine}`,
+    `Last six months: ${sixLine}`,
+    `Pay this month: ${payLine}`,
+  ].join('\n');
 }
 
 // Everything the chat can answer, in order: attendance, club data, greetings, then a sorry reply.
