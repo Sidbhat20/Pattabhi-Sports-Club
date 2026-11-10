@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, attendanceFor } from '../lib/api.js';
-import { batchOf, billableFor, coachPaidIn, dueFor, expensesIn, receivedIn, sumBy } from '../lib/data.js';
-import { absentMessage, dayLabel, feeMessage, monthLabel, rupees, thisMonth, today } from '../lib/format.js';
+import { batchOf, billableFor, coachPaidIn, dueFor, expensesIn, receivedIn, sumBy, netFor } from '../lib/data.js';
+import { absentMessage, dayLabel, feeMessage, monthLabel, rupees, thisMonth, today, netRows } from '../lib/format.js';
 import { Button, Empty, Ledger, PageHeader, Panel, Status } from '../components/ui.jsx';
 import { Contact } from '../components/Contact.jsx';
 
@@ -104,7 +104,7 @@ export function Home({ data, show, live, openForm }) {
             { label: 'Fees collected', value: rupees(received), note: `${receivedIn(data, month).length} payments` },
             { label: 'Fees still owed', value: rupees(pendingTotal), note: `${owing.length} students` },
             { label: 'Expenses', value: rupees(spent), note: `${expensesIn(data, month).length} entries` },
-            { label: 'Net', value: rupees(received - spent), note: received - spent >= 0 ? 'Surplus' : 'Deficit' },
+            ...netRows(netFor(data, [month]), monthLabel(month)),
             { label: 'Coaches paid', value: `${coachesPaid} of ${coaches.length}`, note: 'Full monthly pay recorded' },
           ]}
         />

@@ -40,3 +40,16 @@ export const generalMessage = (s) =>
 
 // Student ID shown on the card: PSC- and the record number, padded to four digits.
 export const studentId = (s) => `PSC-${String(s.id).padStart(4, '0')}`;
+
+// Ledger rows for net: "Net so far", plus the expected net when coach pay is still due.
+export function netRows(net, label) {
+  const rows = [{ label: 'Net so far', value: rupees(net.net), note: `fees collected minus expenses (${label})` }];
+  if (net.due > 0) {
+    rows.push({
+      label: 'Expected net after unpaid coach pay',
+      value: rupees(net.net - net.due),
+      note: `${rupees(net.due)} still due to ${net.dueCoaches.join(', ')}`,
+    });
+  }
+  return rows;
+}

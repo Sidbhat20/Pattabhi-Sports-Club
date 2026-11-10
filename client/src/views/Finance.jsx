@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { coachPaidIn, expensesIn, receivedIn, sumBy } from '../lib/data.js';
-import { dayLabel, monthLabel, rupees, shiftMonth } from '../lib/format.js';
+import { coachPaidIn, expensesIn, receivedIn, sumBy, netFor } from '../lib/data.js';
+import { dayLabel, monthLabel, rupees, shiftMonth, netRows } from '../lib/format.js';
 import { Button, Empty, Ledger, PageHeader, Panel, Segmented, Status, Toolbar } from '../components/ui.jsx';
 
 const MONTH_NAMES = Array.from({ length: 12 }, (_, i) =>
@@ -54,7 +54,7 @@ export function Finance({ data, ui, setUi, openForm, remove }) {
             rows={[
               { label: 'Fees received', value: rupees(totalIn), note: `${months.filter((m) => m.income).length} months with income` },
               { label: 'Expenses', value: rupees(totalOut), note: 'All categories, including coach pay' },
-              { label: 'Net for the year', value: rupees(totalIn - totalOut), note: totalIn - totalOut >= 0 ? 'Surplus' : 'Deficit' },
+              ...netRows(netFor(data, months.map((m) => m.key)), `${year}`),
             ]}
           />
         </Panel>
@@ -136,7 +136,7 @@ export function Finance({ data, ui, setUi, openForm, remove }) {
           rows={[
             { label: 'Fees received', value: rupees(income), note: `${received.length} payments` },
             { label: 'Expenses', value: rupees(spent), note: `${expenses.length} entries` },
-            { label: 'Net', value: rupees(income - spent), note: income - spent >= 0 ? 'Surplus' : 'Deficit' },
+            ...netRows(netFor(data, [month]), monthLabel(month)),
           ]}
         />
       </Panel>

@@ -27,3 +27,21 @@ export const coachPaidIn = (data, coachId, month) =>
 
 // Last ten digits, so +91, 0 and spaces don't stop a number matching a saved contact.
 export const lastTen = (phone) => String(phone || '').replace(/\D/g, '').slice(-10);
+
+// Net for one or more months. "Net so far" is fees collected minus expenses recorded.
+// Expected net also takes off the coach pay still due (monthly pay times months, minus pay recorded).
+export function netFor(data, months) {
+  const income = sumBy(data.payments.filter((p) => months.some((m) => p.paid_on.startsWith(m))), (p) => p.amount);
+  const spent = sumBy(data.expenses.filter((e) => months.some((m) => e.day.startsWith(m))), (e) => e.amount);
+  let due = 0;
+  const dueCoaches = [];
+  for (const c of data.coaches.filter((c) => c.status === 'active' && c.monthly_pay > 0)) {
+    const paid = months.reduce((t, m) => t + coachPaidIn(data, c.id, m), 0);
+    const owed = Math.max(0, c.monthly_pay * months.length - paid);
+    if (owed > 0) {
+      due += owed;
+      dueCoaches.push(c.name);
+    }
+  }
+  return { income, spent, net: income - spent, due, dueCoaches };
+}

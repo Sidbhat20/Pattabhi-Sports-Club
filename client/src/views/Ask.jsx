@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { answerFor } from '../lib/ask.js';
-
-const STARTERS = ['Who is yet to pay?', 'Tell me about U16', 'How is Shridhar doing?', 'What did we spend this month?'];
+import { answer, EXAMPLES } from '../lib/ask.js';
+import { attendanceForMonth } from '../lib/api.js';
+import { today } from '../lib/format.js';
 
 // Long answers are laid out as rows: a heading, then "label: value" lines, then an "and N more" note.
 function Answer({ text }) {
@@ -58,13 +58,13 @@ export function Ask({ data }) {
     setMessages((m) => [...m, { id: Date.now(), from: 'you', text: t }]);
     setText('');
     setTyping(true);
-    let reply;
+    let res;
     try {
-      reply = await answerFor(t, data);
+      res = await answer(t, { data, now: new Date(), today: today(), loadMonth: attendanceForMonth });
     } catch {
-      reply = "Sorry, I couldn't load that just now. Please try again.";
+      res = { text: "Something went wrong while looking that up. Please try again." };
     }
-    setMessages((m) => [...m, { id: Date.now() + 1, from: 'bot', text: reply }]);
+    setMessages((m) => [...m, { id: Date.now() + 1, from: 'bot', text: res.text, chips: res.chips }]);
     setTyping(false);
   };
 
@@ -83,7 +83,7 @@ export function Ask({ data }) {
               <h2>How can I help?</h2>
               <p>Ask about a student, a batch, fees, coach pay, spending, income or attendance.</p>
               <div className="gpt-chips">
-                {STARTERS.map((q) => (
+                {EXAMPLES.map((q) => (
                   <button key={q} type="button" className="gpt-chip" onClick={() => send(q)}>
                     {q}
                   </button>
@@ -100,6 +100,15 @@ export function Ask({ data }) {
               )}
               <div className="gpt-bubble">
                 <Answer text={m.text} />
+                {m.chips && (
+                  <div className="gpt-chips gpt-chips-inline">
+                    {m.chips.map((c) => (
+                      <button key={c.label + c.send} type="button" className="gpt-chip" onClick={() => send(c.send)}>
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ))}
