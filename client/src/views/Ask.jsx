@@ -1,82 +1,136 @@
 import { useEffect, useRef, useState } from 'react';
-import { api } from '../lib/api.js';
-import { MOCK } from '../lib/mock.js';
-import { localAnswer, SUGGESTIONS } from '../lib/ask.js';
-import { Button, PageHeader, Panel, Status } from '../components/ui.jsx';
+import { Button, PageHeader, Status } from '../components/ui.jsx';
 
-export function Ask({ data }) {
-  const [log, setLog] = useState([
-    { from: 'bot', text: 'Ask me about students, batches, fees, coach pay or spending. Try a question below.' },
-  ]);
-  const [q, setQ] = useState('');
-  const [busy, setBusy] = useState(false);
-  const endRef = useRef(null);
+const logo = '/logo.png';
+const SORRY = "Sorry, I can't answer that. This is a demo version and is not production level yet.";
+const QUESTION_START = /^(what|who|when|where|why|how|which|is|are|am|do|does|did|can|could|will|would|should|tell|show|find|list|give|explain)\b/i;
+
+// Demo replies: questions get the sorry message, greetings and thanks get a normal answer.
+export function replyTo(text) {
+  const t = text.trim();
+  const lower = t.toLowerCase();
+  if (/\?$/.test(t) || QUESTION_START.test(t)) return SORRY;
+  if (/^(hi|hii|hello|hey|good (morning|afternoon|evening))\b/.test(lower)) return 'Hello! Nice to meet you. I am the club assistant demo.';
+  if (/thank/.test(lower)) return "You're welcome!";
+  if (/^(bye|goodbye|see you|good night)\b/.test(lower)) return 'Goodbye! Have a great day.';
+  return 'Got it.';
+}
+
+export function Ask() {
+  const [messages, setMessages] = useState([]);
+  const [text, setText] = useState('');
+  const [typing, setTyping] = useState(false);
+  const logRef = useRef(null);
+  const boxRef = useRef(null);
+  const timer = useRef(null);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: 'end' });
-  }, [log.length, busy]);
+    const el = logRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [messages.length, typing]);
 
-  const ask = async (question) => {
-    const text = question.trim();
-    if (!text || busy) return;
-    setLog((l) => [...l, { from: 'you', text }]);
-    setQ('');
-    setBusy(true);
-    let reply = null;
-    let note = null;
-    if (!MOCK) {
-      try {
-        reply = (await api('POST', 'ask', { question: text })).answer;
-      } catch {
-        note = 'The AI is not connected yet, so this answer comes from the club data on screen.';
-      }
+  useEffect(() => {
+    const el = boxRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
     }
-    if (!reply) {
-      await new Promise((r) => setTimeout(r, 600));
-      reply = localAnswer(text, data);
-    }
-    setLog((l) => [...l, { from: 'bot', text: reply, note }]);
-    setBusy(false);
+  }, [text]);
+
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const send = () => {
+    const t = text.trim();
+    if (!t || typing) return;
+    setMessages((m) => [...m, { id: Date.now(), from: 'you', text: t }]);
+    setText('');
+    setTyping(true);
+    const reply = replyTo(t);
+    timer.current = setTimeout(() => {
+      setMessages((m) => [...m, { id: Date.now() + 1, from: 'bot', text: reply }]);
+      setTyping(false);
+    }, 600 + Math.min(reply.length * 10, 800));
+  };
+
+  const newChat = () => {
+    clearTimeout(timer.current);
+    setMessages([]);
+    setTyping(false);
+    setText('');
   };
 
   return (
     <>
-      <PageHeader title="Ask" summary="Ask about the club's students, fees, coaches and money">
-        <Status tone="muted">{MOCK ? 'Demo: answers use sample data' : 'AI assistant'}</Status>
+      <PageHeader title="Club assistant" summary="Chat with the club assistant">
+        <Status tone="muted">Demo</Status>
+        <Button variant="secondary" size="small" onClick={newChat}>New chat</Button>
       </PageHeader>
-      <Panel>
-        <div className="ask-log">
-          {log.map((m, i) => (
-            <div key={i} className={`ask-msg ${m.from}`}>
-              <p>{m.text}</p>
-              {m.note && <small>{m.note}</small>}
-            </div>
-          ))}
-          {busy && (
-            <div className="ask-msg bot">
-              <p className="muted">Looking that up…</p>
+
+      <div className="gpt">
+        <div className="gpt-log" ref={logRef} aria-live="polite">
+          {!messages.length && (
+            <div className="gpt-empty">
+              <img src={logo} alt="" />
+              <h2>How can I help?</h2>
+              <p>Say hello, or type a message below.</p>
             </div>
           )}
-          <div ref={endRef} />
-        </div>
-        <div className="chips">
-          {SUGGESTIONS.map((s) => (
-            <button key={s} type="button" className="chip" onClick={() => ask(s)} disabled={busy}>
-              {s}
-            </button>
+          {messages.map((m) => (
+            <div key={m.id} className={`gpt-row ${m.from}`}>
+              {m.from === 'bot' && (
+                <span className="gpt-avatar" aria-hidden="true">
+                  <img src={logo} alt="" />
+                </span>
+              )}
+              <div className="gpt-bubble">{m.text}</div>
+            </div>
           ))}
+          {typing && (
+            <div className="gpt-row bot">
+              <span className="gpt-avatar" aria-hidden="true">
+                <img src={logo} alt="" />
+              </span>
+              <div className="gpt-bubble">
+                <span className="gpt-typing" aria-label="Assistant is typing">
+                  <span />
+                  <span />
+                  <span />
+                </span>
+              </div>
+            </div>
+          )}
         </div>
-        <form
-          className="ask-input"
-          onSubmit={(e) => {
-            e.preventDefault();
-            ask(q);
-          }}
-        >
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ask a question" aria-label="Question" />
-          <Button type="submit" variant="primary" disabled={busy || !q.trim()}>Ask</Button>
-        </form>
-      </Panel>
+
+        <div className="gpt-composer">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              send();
+            }}
+          >
+            <textarea
+              ref={boxRef}
+              rows={1}
+              value={text}
+              placeholder="Message the club assistant"
+              aria-label="Message"
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+            />
+            <button type="submit" className="gpt-send" disabled={typing || !text.trim()} aria-label="Send">
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 12l16-8-6 16-2-7-8-1z" fill="currentColor" />
+              </svg>
+            </button>
+          </form>
+          <p className="gpt-foot">Demo only. Answers are not connected to the club's data yet.</p>
+        </div>
+      </div>
     </>
   );
 }
